@@ -1,8 +1,8 @@
-import 'package:band_names/modules/mongolite/object_id.dart';
+import '../../g3s.dart';
 
 /// Abstract class definition for [Model].
 ///
-/// Use [Model] abstract class to define inherited class for [Mongolite] collections
+/// Use [Model] abstract class to define inherited class for [G3S] collections
 /// and documents.
 ///
 /// **Example:**
@@ -52,8 +52,8 @@ import 'package:band_names/modules/mongolite/object_id.dart';
 /// To make use of inherited class from [Model] type this at `main` function (????):
 /// ```dart
 /// final dbProvider = DBProvider();
-/// Mongolite.instance.setDatabase(dbProvider);
-/// Mongolite.instance.setSchema<SomeModel>(
+/// G3S.instance.setDatabase(dbProvider);
+/// G3S.instance.setSchema<SomeModel>(
 ///   'some_collection',
 ///   SomeModel.schema,
 ///   SomeModel.fromMap,
@@ -62,13 +62,13 @@ import 'package:band_names/modules/mongolite/object_id.dart';
 abstract class Model {
   /// The [local] attribute refers to an hexadecimal [String] of an [ObjectId].
   /// 
-  /// Use as `TEXT PRIMARY KEY` of [Mongolite] local [Database] to select a
-  /// [Document] of a [Collection] with `Mongolite.instance.collection('some_collection').doc(local)`.
+  /// Use as `TEXT PRIMARY KEY` of [G3S] local [Database] to select a
+  /// [Document] of a [Collection] with `G3S.instance.collection('some_collection').doc(local)`.
   String local;
   
   /// The [remote] attribute refers to an hexadecimal [String] of an [ObjectId].
   /// 
-  /// Use as `TEXT UNIQUE` of [Mongolite] local [Database] to emit changes of a 
+  /// Use as `TEXT UNIQUE` of [G3S] local [Database] to emit changes of a 
   /// [Document] to the syncronization services.
   String remote;
 

@@ -1,5 +1,4 @@
-import 'package:band_names/modules/mongolite/mongolite.dart';
-import 'package:band_names/modules/mongolite/model.dart';
+import 'package:band_names/modules/g3s/g3s.dart';
 import 'package:band_names/provider/db.dart';
 
 class Band extends Model {
@@ -43,9 +42,46 @@ class Band extends Model {
 void test() async {
   // init
   final dbProvider = DBProvider();
-  Mongolite.instance.setDatabase(dbProvider);
-  Mongolite.instance.setSchema<Band>('bands', Band.schema, Band.fromMap);
+  G3S.instance.setDatabase(dbProvider);
+  G3S.instance.setSchema<Band>('bands', Band.schema, Band.fromMap);
   // use
-  Band band = await Mongolite.instance.collection('bands').doc('123').get();
-  print(band);
+  final g3s = G3S.instance;
+  final Collection<Band> bands = g3s.collection('bands');
+  // create
+  var doc = await bands.add({
+    'name': 'Metallica',
+    'votes': 0,
+  });
+  // read collection
+  final bandsStream = bands.snapshots();
+  bandsStream.listen((value) {
+    print(value);
+  });
+  final bandsFuture = bands.get();
+  bandsFuture.then((value) {
+    print(value);
+  });
+  // read collection with filters
+  final bandsFilteredStream = bands.find({'votes': 0}).snapshots();
+  bandsStream.listen((value) {
+    print(value);
+  });
+  final bandsFilteredFuture = bands.find({'votes': 0}).get();
+  bandsFuture.then((value) {
+    print(value);
+  });
+  // read document
+  final band = bands.doc(doc.local);
+  final bandStream = band.snapshots();
+  bandStream.listen((value) {
+    print(value);
+  });
+  final bandFuture = band.get();
+  bandFuture.then((value) {
+    print(value);
+  });
+  // update document
+  doc = await band.update({'votes': doc.votes + 1});
+  // delete document
+  await band.delete();
 }

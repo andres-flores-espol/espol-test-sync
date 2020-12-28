@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:band_names/modules/mongolite/database_provider.dart';
+import 'package:band_names/modules/g3s/src/abstracts/database_provider.dart';
 
 class DBProvider extends DatabaseProvider {
   static final DBProvider _instance = DBProvider._internal();
