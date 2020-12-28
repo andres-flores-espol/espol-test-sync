@@ -1,4 +1,3 @@
-import 'package:band_names/services/sync.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 

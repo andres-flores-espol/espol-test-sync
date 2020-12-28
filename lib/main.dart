@@ -1,6 +1,5 @@
 import 'package:band_names/pages/status.dart';
 import 'package:band_names/provider/sync_cron.dart';
-import 'package:band_names/services/socket.dart';
 import 'package:flutter/material.dart';
 
 import 'package:band_names/pages/home.dart';

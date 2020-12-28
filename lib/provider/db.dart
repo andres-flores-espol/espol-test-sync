@@ -1,19 +1,23 @@
 import 'dart:io';
 import 'package:path/path.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:band_names/modules/mongolite/database_provider.dart';
 
-class DBProvider {
+class DBProvider extends DatabaseProvider {
   static final DBProvider _instance = DBProvider._internal();
   factory DBProvider() => _instance;
   DBProvider._internal();
 
   static Database _database;
+
+  @override
   Future<Database> get database async {
     if (_database == null) _database = await initDB();
     return _database;
   }
 
+  @override
   Future<Database> initDB() async {
     Directory directory = await getApplicationDocumentsDirectory();
     final path = join(directory.path, 'store.db');

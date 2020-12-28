@@ -1,8 +1,6 @@
 import 'package:band_names/services/socket.dart';
 import 'package:band_names/services/sync.dart';
-import 'package:connectivity/connectivity.dart';
 import 'package:cron/cron.dart';
-import 'dart:io';
 
 class SyncCronProvider {
   final SyncService _syncService = SyncService();
