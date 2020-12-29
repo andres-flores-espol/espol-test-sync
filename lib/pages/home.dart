@@ -1,13 +1,16 @@
-import 'package:band_names/services/bands.dart';
+import 'package:band_names/models/band.dart';
+// import 'package:band_names/services/bands.dart';
+import 'package:band_names/modules/g3s/g3s.dart';
 import 'package:band_names/services/socket.dart';
-import 'package:band_names/services/sync.dart';
+// import 'package:band_names/services/sync.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class HomePage extends StatelessWidget {
+  final bandsCollection = G3S.instance.collection('bands');
   final socketService = SocketService();
-  final bandService = BandService();
-  final syncService = SyncService();
+  // final bandService = BandService();
+  // final syncService = SyncService();
 
   @override
   Widget build(BuildContext context) {
@@ -36,21 +39,22 @@ class HomePage extends StatelessWidget {
     return SingleChildScrollView(
       child: Column(
         children: [
-          StreamBuilder(
-            stream: syncService.collectionStream,
-            builder: (BuildContext context, AsyncSnapshot<Map<String, Map<String, dynamic>>> snapshot) {
+          // StreamBuilder(
+          //   stream: syncService.collectionStream,
+          //   builder: (BuildContext context, AsyncSnapshot<Map<String, Map<String, dynamic>>> snapshot) {
+          //     if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
+          //     final syncs = snapshot.data.values.toList();
+          //     return Column(
+          //       children:
+          //           syncs.map((s) => Text('${s['collection']}.${s['method']}-${s['document']}-${s['state']}')).toList(),
+          //     );
+          //   },
+          // ),
+          StreamBuilder<List<Band>>(
+            stream: bandsCollection.snapshots(),
+            builder: (context, snapshot) {
               if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
-              final syncs = snapshot.data.values.toList();
-              return Column(
-                children: syncs.map((s) => Text('${s['collection']}.${s['method']}-${s['document']}-${s['state']}')).toList(),
-              );
-            },
-          ),
-          StreamBuilder(
-            stream: bandService.collectionStream,
-            builder: (BuildContext context, AsyncSnapshot<Map<String, Map<String, dynamic>>> snapshot) {
-              if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
-              final bands = snapshot.data.values.toList();
+              final bands = snapshot.data;
               return Column(
                 children: bands.map(_bandTile).toList(),
               );
@@ -72,12 +76,12 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _bandTile(Map<String, dynamic> band) {
+  Widget _bandTile(Band band) {
     return Dismissible(
-      key: Key(band['id']),
+      key: Key(band.local),
       direction: DismissDirection.startToEnd,
       onDismissed: (direction) {
-        bandService.deleteOne(band['id']);
+        bandsCollection.doc(band.local).delete();
       },
       background: Container(
           padding: EdgeInsets.only(left: 8.0),
@@ -88,11 +92,11 @@ class HomePage extends StatelessWidget {
           )),
       child: ListTile(
         leading: CircleAvatar(
-          child: Text(band['name'].substring(0, 2)),
+          child: Text(band.name.substring(0, 2)),
           backgroundColor: Colors.blue[100],
         ),
-        title: Text(band['name']),
-        trailing: Text('${band['votes']}', style: TextStyle(fontSize: 20)),
+        title: Text(band.name),
+        trailing: Text('${band.votes}', style: TextStyle(fontSize: 20)),
         onTap: () => _incrementVotes(band),
       ),
     );
@@ -122,7 +126,7 @@ class HomePage extends StatelessWidget {
 
   void addBandToList(BuildContext context, String name) {
     if (name.length > 1) {
-      bandService.create({
+      bandsCollection.add({
         'name': name,
         'votes': 0,
       });
@@ -130,10 +134,10 @@ class HomePage extends StatelessWidget {
     Navigator.pop(context);
   }
 
-  void _incrementVotes(band) {
+  void _incrementVotes(Band band) {
     final changes = {
-      'votes': band['votes'] + 1,
+      'votes': band.votes + 1,
     };
-    bandService.updateOne(band['id'], changes);
+    bandsCollection.doc(band.local).update(changes);
   }
 }

@@ -3,19 +3,22 @@ import 'package:band_names/services/sync.dart';
 import 'package:cron/cron.dart';
 
 class SyncCronProvider {
-  final SyncService _syncService = SyncService();
-  SyncCronProvider() {
+  static final SyncCronProvider _instance = SyncCronProvider._internal();
+  factory SyncCronProvider() => _instance;
+  SyncCronProvider._internal() {
     Cron cron = Cron();
     // Ejecuta cada 1 min
     cron.schedule(Schedule.parse('* * * * *'), () async {
-      print('Intenta conexión');
+      // print('Intenta conexión');
       connection();
     });
   }
 
+  final SyncService _syncService = SyncService();
+
   void connection() async {
     if (_syncService.socketService.serverStatus == ServerStatus.Online) {
-      print('Tengo Internet');
+      // print('Tengo Internet');
       if (!_syncService.emiting) {
         _syncService.emiting = true;
         _syncService.emit();
@@ -25,7 +28,7 @@ class SyncCronProvider {
         _syncService.socket.emitBuffered();
       }
     } else {
-      print('No tengo internet');
+      // print('No tengo internet');
     }
   }
 }

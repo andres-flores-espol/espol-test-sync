@@ -1,4 +1,5 @@
 import 'package:sqflite/sqflite.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:band_names/modules/g3s/src/abstracts/model.dart';
 import 'package:band_names/modules/g3s/src/collection.dart';
 import 'package:band_names/modules/g3s/src/abstracts/database_provider.dart';
@@ -14,13 +15,13 @@ export 'src/object_id.dart';
 ///
 /// You can get an instance by calling `G3S.instance`.
 class G3S {
-  static G3S _mongoLite;
+  static G3S _g3s;
   G3S._();
 
   /// Returns an instance of [G3S].
   static G3S get instance {
-    if (G3S._mongoLite == null) G3S._mongoLite = G3S._();
-    return G3S._mongoLite;
+    if (G3S._g3s == null) G3S._g3s = G3S._();
+    return G3S._g3s;
   }
 
   factory G3S() {
@@ -34,7 +35,7 @@ class G3S {
   /// Gets a [Collection] for the specified collection name.
   Collection collection(String name) {
     assert(_collections.containsKey(name), "Collection does not exist for name $name");
-    _collections[name].find();
+    _collections[name].where({});
     return _collections[name];
   }
 
@@ -50,8 +51,8 @@ class G3S {
     assert(name != null, "Collection name cannot be null");
     assert(name.isNotEmpty, "Collection name must be a non-empty string");
     assert(_regExp.hasMatch(name), "Collection name must contain only lower case letter and underscores");
-    assert(!_collections.containsKey(name), "Collection already exist for name $name");
-    assert(!_schemas.containsKey(name), "Schema already exist for name $name");
+    if (_collections.containsKey(name)) return;
+    if (_schemas.containsKey(name)) return;
     _collections.putIfAbsent(name, () => Collection<T>(name, fromMap));
     _schemas.putIfAbsent(name, () => schema);
   }
@@ -61,14 +62,14 @@ class G3S {
 
   /// Gets a [Future] of [Database] from a [DatabaseProvider].
   ///
-  /// This getter requires the `G3S.instance.setDatabase` to be called with an instance
-  /// of inherited class of [DatabaseProvider] abstract class.
+  /// This getter requires the `G3S.instance.setDatabase` to be called with an
+  /// instance of inherited class of [DatabaseProvider] abstract class.
   Future<Database> get local async {
     if (_local == null) {
       _local = await _databaseProvider.database;
       for (final schema in _schemas.entries) {
         final schemaString = schema.value.entries.map((e) => '${e.key} ${e.value}').join(',');
-        await _local.execute("CREATE TABLE IF NOT EXIST \"g3s.${schema.key}\" ($schemaString)");
+        await _local.execute("CREATE TABLE IF NOT EXISTS \"g3s.${schema.key}\" ($schemaString)");
       }
     }
     return _local;
@@ -76,8 +77,23 @@ class G3S {
 
   /// Sets an instance of inherited class from [DatabaseProvider] abstract class to
   /// make use of `G3S.instance.local`.
-  void setDatabase(DatabaseProvider databaseProvider) {
+  void setDatabaseProvider(DatabaseProvider databaseProvider) {
     assert(databaseProvider != null, "Database provider cannot be null");
     _databaseProvider = databaseProvider;
+  }
+
+  IO.Socket _socket;
+
+  /// Gets an [IO.Socket] from a socket connection.
+  ///
+  /// This getter requires the `G3S.instance.setIOSocket` to be called with an
+  /// instance of [IO.Socket] from a socket connection.
+  IO.Socket get socket => _socket;
+
+  /// Sets an instance of [IO.Socket] from a socket connection to make use of
+  /// `G3S.instance.socket`
+  void setIOSocket(IO.Socket socket) {
+    assert(socket != null, "Socket cannot be null");
+    _socket = socket;
   }
 }

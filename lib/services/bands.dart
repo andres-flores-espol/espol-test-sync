@@ -13,7 +13,7 @@ class BandService extends CollectionService {
     _syncService.services.putIfAbsent(name, () => this);
     find({});
     socket.on('create', (data) {
-      print(data);
+      // print(data);
     });
   }
 

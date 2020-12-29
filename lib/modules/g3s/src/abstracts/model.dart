@@ -76,7 +76,7 @@ abstract class Model {
   /// value.
   Model({String local, String remote}) {
     this.local = ObjectId(local).str;
-    this.remote = ObjectId(remote ?? local).str;
+    this.remote = ObjectId(remote ?? this.local).str;
   }
 
   /// Transform a [Model] instance to a [Map] of [String] key and [dynamic] value.

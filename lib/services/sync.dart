@@ -45,13 +45,13 @@ class SyncService extends CollectionService {
         orderBy: 'datetime',
       );
       if (collection.length == 0) {
-        print('sync ready');
+        // print('sync ready');
         emiting = false;
         return;
       }
     }
     final event = collection[0];
-    print(event);
+    // print(event);
     switch (event['method']) {
       case 'create':
         try {
@@ -82,7 +82,7 @@ class SyncService extends CollectionService {
         }
         break;
       default:
-        print('Unknown method.');
+        // print('Unknown method.');
     }
   }
 

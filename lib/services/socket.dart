@@ -26,9 +26,9 @@ class SocketService {
       'transports': ['websocket'],
       'autoConnect': true,
     });
-    IO.EVENTS.forEach((event) {
-      this._socket.on(event, (_) => print('IO.Socket: $event' + (_ != null ? ': $_' : '')));
-    });
+    // IO.EVENTS.forEach((event) {
+    //   this._socket.on(event, (_) => print('IO.Socket: $event' + (_ != null ? ': $_' : '')));
+    // });
     this._socket.on('connect', (_) {
       changeServerStatus(ServerStatus.Online);
     });

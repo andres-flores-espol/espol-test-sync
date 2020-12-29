@@ -9,22 +9,14 @@ class DBProvider extends DatabaseProvider {
   factory DBProvider() => _instance;
   DBProvider._internal();
 
-  static Database _database;
-
-  @override
-  Future<Database> get database async {
-    if (_database == null) _database = await initDB();
-    return _database;
-  }
-
   @override
   Future<Database> initDB() async {
     Directory directory = await getApplicationDocumentsDirectory();
     final path = join(directory.path, 'store.db');
-    print(path);
+    // print(path);
     return await openDatabase(path, version: 1, onCreate: (Database db, int version) async {
       for (String createTable in createTables) {
-        print(createTable);
+        // print(createTable);
         await db.execute(createTable);
       }
     });

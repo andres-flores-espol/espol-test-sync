@@ -36,8 +36,8 @@ dependencies:
   path:
   cron:
   connectivity:
-  firebase_core:
-  cloud_firestore:
+  # firebase_core:
+  # cloud_firestore:
 
 dev_dependencies:
   flutter_test:
