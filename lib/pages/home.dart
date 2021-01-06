@@ -7,13 +7,12 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class HomePage extends StatelessWidget {
-  final bandsCollection = G3S.instance.collection('bands');
+  final bandCollection = G3S.instance.collection('band');
   final socketService = SocketService();
-  // final bandService = BandService();
-  // final syncService = SyncService();
 
   @override
   Widget build(BuildContext context) {
+    _asyncFuture();
     return Scaffold(
       appBar: AppBar(
         title: Text('BandNames', style: TextStyle(color: Colors.black87)),
@@ -35,6 +34,12 @@ class HomePage extends StatelessWidget {
     );
   }
 
+  Future<void> _asyncFuture() async {
+    // await bandCollection.add({
+    //   'name':''
+    // });
+  }
+
   Widget _content(BuildContext context) {
     return SingleChildScrollView(
       child: Column(
@@ -50,16 +55,17 @@ class HomePage extends StatelessWidget {
           //     );
           //   },
           // ),
-          StreamBuilder<List<Band>>(
-            stream: bandsCollection.snapshots(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
-              final bands = snapshot.data;
-              return Column(
-                children: bands.map(_bandTile).toList(),
-              );
-            },
-          ),
+          // StreamBuilder<List<Band>>(
+          //   stream: bandCollection.snapshots(),
+          //   builder: (context, snapshot) {
+          //     print(snapshot);
+          //     if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
+          //     final bands = snapshot.data;
+          //     return Column(
+          //       children: bands.map(_bandTile).toList(),
+          //     );
+          //   },
+          // ),
         ],
       ),
     );
@@ -81,7 +87,7 @@ class HomePage extends StatelessWidget {
       key: Key(band.local),
       direction: DismissDirection.startToEnd,
       onDismissed: (direction) {
-        bandsCollection.doc(band.local).delete();
+        bandCollection.doc(band.local).delete();
       },
       background: Container(
           padding: EdgeInsets.only(left: 8.0),
@@ -96,6 +102,7 @@ class HomePage extends StatelessWidget {
           backgroundColor: Colors.blue[100],
         ),
         title: Text(band.name),
+        subtitle: Text('${band.city.name}, ${band.city.country}'),
         trailing: Text('${band.votes}', style: TextStyle(fontSize: 20)),
         onTap: () => _incrementVotes(band),
       ),
@@ -126,9 +133,13 @@ class HomePage extends StatelessWidget {
 
   void addBandToList(BuildContext context, String name) {
     if (name.length > 1) {
-      bandsCollection.add({
+      bandCollection.add({
         'name': name,
         'votes': 0,
+        'city': {
+          'name': 'Temuco',
+          'country': 'Chale',
+        },
       });
     }
     Navigator.pop(context);
@@ -138,6 +149,6 @@ class HomePage extends StatelessWidget {
     final changes = {
       'votes': band.votes + 1,
     };
-    bandsCollection.doc(band.local).update(changes);
+    bandCollection.doc(band.local).update(changes);
   }
 }

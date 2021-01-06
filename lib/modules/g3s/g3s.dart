@@ -28,15 +28,14 @@ class G3S {
     return G3S.instance;
   }
 
-  static final _regExp = RegExp(r"^[a-z_]+$");
+  static final _regExp = RegExp(r"^[a-z_.]+$");
   static final _collections = Map<String, Collection>();
   static final _schemas = Map<String, Map<String, String>>();
 
   /// Gets a [Collection] for the specified collection name.
   Collection collection(String name) {
     assert(_collections.containsKey(name), "Collection does not exist for name $name");
-    _collections[name].where({});
-    return _collections[name];
+    return _collections[name].where({});
   }
 
   /// Sets the model, schema and fromMap function for a new [Collection] with
@@ -44,7 +43,7 @@ class G3S {
   void setSchema<T extends Model>(
     String name,
     Map<String, String> schema,
-    T Function(Map<String, dynamic>) fromMap,
+    Function(Map<String, dynamic>) fromMap,
   ) {
     assert(schema != null, "Collection schema cannot be null");
     assert(schema.isNotEmpty, "Collection schema must be a non-empty map");

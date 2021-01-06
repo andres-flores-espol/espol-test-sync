@@ -10,8 +10,8 @@ import '../../g3s.dart';
 /// ```dart
 /// class SomeModel extends Model {
 ///   static final Map<String, String> schema = {
-///     'local': 'TEXT PRIMARY KEY,', // Required
-///     'remote': 'TEXT UNIQUE,', // Required
+///     'local': 'TEXT PRIMARY KEY', // Required
+///     'remote': 'TEXT UNIQUE', // Required
 ///     'someText': 'TEXT',
 ///     'someInteger': 'INTEGER',
 ///   }
@@ -28,7 +28,7 @@ import '../../g3s.dart';
 ///
 ///   // Required static method
 ///   static SomeModel fromMap(Map<String, dynamic> obj) {
-///     return Band(
+///     return SomeModel(
 ///       local: obj['local'], // Required
 ///       remote: obj['remote'] ?? obj['_id'] ?? obj['local'], // Required
 ///       someText: obj['someText'],
