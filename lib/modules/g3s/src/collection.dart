@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import '../g3s.dart';
 
 /// A [Collection] object can be used for adding [Document]s, getting [Document]s,
@@ -8,7 +9,8 @@ class Collection<T extends Model> with CollectionMixin {
   Function(Map<String, dynamic>) _fromMap;
   Map<String, dynamic> _filter = {};
   Map<String, dynamic> _currentFilter = {};
-  bool _loading = false;
+  bool loading = false;
+  bool _remote;
   final _docs = Map<String, Document<T>>();
 
   /// The [name] of the [Collection]
@@ -36,28 +38,30 @@ class Collection<T extends Model> with CollectionMixin {
   Map<String, dynamic> get currentFilter => _currentFilter;
 
   /// Sets the [name] of the [Collection] and the [fromMap] method of the Model.
-  Collection(String name, Function(Map<String, dynamic>) fromMap) {
+  Collection(String name, Function(Map<String, dynamic>) fromMap, bool remote) {
     this._name = name;
     this._fromMap = fromMap;
+    this._remote = remote;
   }
 
   /// Makes a [filter] query into [local] database in a table specified by his [name].
-  Future<List<Map<String, dynamic>>> _findLocal() async {
+  Future<List<Map<String, dynamic>>> _selectLocal(Map<String, dynamic> filter, Map<String, String> orderBy) async {
     final local = await G3S.instance.local;
-    final where = _filter.keys.map((key) => '$key=?').join(' AND ');
-    final whereArgs = _filter.values.map((value) => value).toList();
+    final where = filter.keys.map((key) => '$key=?').join(' AND ');
+    final whereArgs = filter.values.map((value) => value).toList();
+    final order = orderBy.entries.map((e) => '${e.key} ${e.value}').join(', ');
     final documentList = await local.query(
       '\"g3s.$name\"',
-      where: where.isNotEmpty ? where : 'TRUE',
+      where: where.isNotEmpty ? where : null,
       whereArgs: whereArgs,
+      orderBy: _order.isNotEmpty ? order : null,
     );
     return documentList.map((e) => Map<String, dynamic>.from(e)).toList();
   }
 
   /// Updates the [Stream] of current [Collection] with a specified [documentList].
   void _updateStream(List<Map<String, dynamic>> documentList) {
-    final collection = this.collection;
-    collection.clear();
+    final collection = Map<String, Map<String, dynamic>>();
     documentList.forEach((document) {
       collection.putIfAbsent(document['local'], () => document);
     });
@@ -67,25 +71,26 @@ class Collection<T extends Model> with CollectionMixin {
   void _updateDocs(List<Map<String, dynamic>> documentList) {
     documentList.forEach((value) {
       if (_docs.containsKey(value['local'])) return;
-      final newDocument = Document<T>(this, value);
+      final newDocument = Document<T>(this, value, _remote);
       _docs.putIfAbsent(value['local'], () => newDocument);
     });
   }
 
-  _findRemote(bool forceLocal) async {
-    if (forceLocal || G3S.instance.socket.disconnected) {
-      _loading = false;
+  void _selectRemote(Map<String, dynamic> filter) async {
+    if (G3S.instance.socket.disconnected || !_remote) {
+      loading = false;
     } else {
-      // {
-      //   'collection': name,
-      //   'method': 'find',
-      //   'document': json.encode(filter),
-      //   'datetime': DateTime.now().millisecondsSinceEpoch,
-      //   'state': 0,
-      // };
-      // onAck: _loafing = false
-      await Future.delayed(Duration(seconds: 3));
-      _loading = false;
+      final g3s = G3S.instance;
+      await g3s.syncCollection.add({
+        'collection': name,
+        'document': null,
+        'method': 'select',
+        'arg': json.encode(filter),
+        'datetime': (DateTime.now().millisecondsSinceEpoch / 1000).floor(),
+      });
+      g3s.emit();
+      // await Future.delayed(Duration(seconds: 3));
+      // loading = false;
     }
   }
 
@@ -100,10 +105,12 @@ class Collection<T extends Model> with CollectionMixin {
   /// Notifies of query results at this [Collection].
   Stream<List<T>> snapshots() {
     _currentFilter = _filter;
-    _findLocal().then((documentList) {
+    final currentFilter = _currentFilter;
+    final orderBy = Map<String, String>.from(_order);
+    _selectLocal(currentFilter, orderBy).then((documentList) {
       _updateStream(documentList);
       _updateDocs(documentList);
-      _findRemote(false);
+      _selectRemote(currentFilter);
     });
     return stream.transform<List<T>>(_streamModel);
   }
@@ -111,104 +118,148 @@ class Collection<T extends Model> with CollectionMixin {
   Future<void> _waitForIt() async {
     await Future.doWhile(() async {
       await Future.delayed(Duration(milliseconds: 33));
-      return _loading;
+      return loading;
     });
   }
 
   /// Fetch the documents for this [Collection].
   Future<List<T>> get([bool forceLocal = false]) async {
-    _loading = true;
-    final documentList = await _findLocal();
+    final filter = Map<String, dynamic>.from(_filter);
+    final orderBy = Map<String, String>.from(_order);
+    var documentList = await _selectLocal(filter, orderBy);
     _updateDocs(documentList);
-    _findRemote(forceLocal);
-    await _waitForIt();
+    if (!forceLocal) {
+      loading = true;
+      _selectRemote(filter);
+      await _waitForIt();
+      documentList = await _selectLocal(filter, orderBy);
+      _updateDocs(documentList);
+    }
+    where({});
     return await Future.wait(documentList.map((e) => fromMap(e)));
   }
 
   /// Returns a [Document] with the provided id.
   Document<T> doc(String localKey) {
     assert(localKey != null, "Document local key cannot be null");
-    assert(_docs.containsKey(localKey), "Document does not exist for local key $localKey");
+    assert(_docs.containsKey(localKey), "Document does not exist for local key $localKey at $name Collection");
     return _docs[localKey];
   }
 
   Future<Map<String, dynamic>> _prepareData(Map<String, dynamic> data) async {
     assert(data != null);
-    return (await fromMap(data)).toMap();
+    final _data = Map<String, dynamic>.from(data);
+    return (await fromMap(_data)).toMap();
   }
 
   void _addDocument(Map<String, dynamic> data) {
-    assert(!_docs.containsKey(data['local']), "Document already exist for key ${data['local']}");
-    final newDocument = Document<T>(this, data);
-    _docs.putIfAbsent(data['local'], () => newDocument);
+    final _data = Map<String, dynamic>.from(data);
+    assert(!_docs.containsKey(_data['local']), "Document already exist for key ${_data['local']} at $name Collection");
+    final newDocument = Document<T>(this, _data, _remote);
+    _docs.putIfAbsent(_data['local'], () => newDocument);
   }
 
   /// Adds a document [data] to the [Stream] of current [Collection] if matches with
   /// the specified [filter].
   void _addStream(Map<String, dynamic> data) {
+    final _data = Map<String, dynamic>.from(data);
     final collection = this.collection;
     for (final entry in currentFilter.entries) {
       final key = entry.key;
       final value = entry.value;
-      if (data.containsKey(key)) {
-        if (data[key] != value) return;
+      if (_data.containsKey(key)) {
+        if (_data[key] != value) return;
       }
     }
-    collection.putIfAbsent(data['local'], () => data);
+    collection.putIfAbsent(_data['local'], () => _data);
     change(collection);
   }
 
   /// Creates new documents for nested datas
   Future<Map<String, dynamic>> _addNesteds(Map<String, dynamic> data) async {
-    final entries = data.entries.toList();
+    final _data = Map<String, dynamic>.from(data);
+    final entries = _data.entries.toList();
     for (var entry in entries) {
       final key = entry.key;
       final value = entry.value;
       if (value is Map) {
-        value[name] = data['local'];
-        await G3S.instance.collection("$name.$key").add(value);
-        data.remove(key);
+        value[name] = _data['local'];
+        await G3S.instance.collection("$name.$key").add(value, true);
+        _data.remove(key);
       } else if (value is List) {
-        for (var element in value) {
-          if (element is Map) {
-            element.putIfAbsent(name, () => data['local']);
-            await G3S.instance.collection("$name.$key").add(element);
+        for (var index in value.asMap().keys) {
+          if (value[index] is Map) {
+            value[index][name] = _data['local'];
+            await G3S.instance.collection("$name.$key").add(value[index], true);
           }
         }
-        data.remove(key);
+        _data.remove(key);
       }
     }
-    return data;
+    return _data;
   }
 
   /// Insert the document [data] into local [Database] in a table specified by his [name]
   Future<void> _addLocal(Map<String, dynamic> data) async {
+    final _data = Map<String, dynamic>.from(data);
     final local = await G3S.instance.local;
-    await local.insert('\"g3s.$name\"', data);
+    await local.insert('\"g3s.$name\"', _data);
   }
 
-  _addRemote(String primaryKey) {
-    // {
-    //   'collection': name,
-    //   'method': 'create',
-    //   'document': primaryKey,
-    //   'datetime': DateTime.now().millisecondsSinceEpoch,
-    //   'state': 0,
-    // }
+  Map<String, dynamic> _clean(Map<String, dynamic> data, String parent) {
+    final _data = Map<String, dynamic>.from(data);
+    _data.remove('local');
+    _data.remove('remote');
+    _data.forEach((key, value) {
+      if (value is Map) {
+        value.remove(parent);
+        _data.update(key, (value) => _clean(value, '$parent.$key'));
+      }
+      if (value is List) {
+        _data.update(
+          key,
+          (value) => value.map(
+            (element) {
+              if (element is Map) {
+                element.remove(parent);
+                element = _clean(element, '$parent.$key');
+              }
+              return element;
+            },
+          ).toList(),
+        );
+      }
+    });
+    return _data;
+  }
+
+  _addRemote(Map<String, dynamic> data) async {
+    if (G3S.instance.socket.disconnected || !_remote) return;
+    final g3s = G3S.instance;
+    final _data = _clean(data, name);
+    await g3s.syncCollection.add({
+      'collection': name,
+      'document': data['local'],
+      'method': 'create',
+      'arg': json.encode(_data),
+      'datetime': (DateTime.now().millisecondsSinceEpoch / 1000).floor(),
+    });
+    g3s.emit();
   }
 
   /// This [Future] creates a new document to the collection and insterts it into the
   /// stream, the local database and the remote database.
   ///
   /// This [Future] returns a [Model] object of the created data.
-  Future<T> add(Map<String, dynamic> data) async {
-    data = await _prepareData(data);
-    _addDocument(data);
-    _addStream(data);
-    data = await _addNesteds(data);
-    await _addLocal(data);
-    _addRemote(data['local']);
-    return await fromMap(data);
+  Future<T> add(Map<String, dynamic> data, [bool forceLocal = false]) async {
+    var _data = Map<String, dynamic>.from(data);
+    _data = await _prepareData(_data);
+    _addDocument(_data);
+    _addStream(_data);
+    if (!forceLocal) _addRemote(_data);
+    _data = await _addNesteds(_data);
+    await _addLocal(_data);
+    return await fromMap(_data);
   }
 
   /// The [filter] argument describes the conditions of the query. It only supports equalities.
@@ -218,5 +269,21 @@ class Collection<T extends Model> with CollectionMixin {
   Collection<T> where(Map<String, dynamic> filter) {
     _filter = filter;
     return this;
+  }
+
+  Map<String, String> _order = Map<String, String>();
+  Map<String, String> get order => _order;
+
+  Collection<T> orderBy(Map<String, String> order) {
+    _order = order;
+    return this;
+  }
+
+  /// DONT USE OUT OF DOCUMENT CLASS DEFINITION IN THE MODULE
+  deleteDoc(String localKey) {
+    final collection = this.collection;
+    _docs.remove(localKey);
+    collection.remove(localKey);
+    change(collection);
   }
 }

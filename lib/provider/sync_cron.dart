@@ -9,7 +9,6 @@ class SyncCronProvider {
     Cron cron = Cron();
     // Ejecuta cada 1 min
     cron.schedule(Schedule.parse('* * * * *'), () async {
-      // print('Intenta conexión');
       connection();
     });
   }
@@ -18,7 +17,6 @@ class SyncCronProvider {
 
   void connection() async {
     if (_syncService.socketService.serverStatus == ServerStatus.Online) {
-      // print('Tengo Internet');
       if (!_syncService.emiting) {
         _syncService.emiting = true;
         _syncService.emit();
@@ -28,7 +26,6 @@ class SyncCronProvider {
         _syncService.socket.emitBuffered();
       }
     } else {
-      // print('No tengo internet');
     }
   }
 }

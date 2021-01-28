@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../../g3s.dart';
 
 /// Abstract class definition for [Model].
@@ -61,14 +63,14 @@ import '../../g3s.dart';
 /// ```
 abstract class Model {
   /// The [local] attribute refers to an hexadecimal [String] of an [ObjectId].
-  /// 
+  ///
   /// Use as `TEXT PRIMARY KEY` of [G3S] local [Database] to select a
   /// [Document] of a [Collection] with `G3S.instance.collection('some_collection').doc(local)`.
   String local;
-  
+
   /// The [remote] attribute refers to an hexadecimal [String] of an [ObjectId].
-  /// 
-  /// Use as `TEXT UNIQUE` of [G3S] local [Database] to emit changes of a 
+  ///
+  /// Use as `TEXT UNIQUE` of [G3S] local [Database] to emit changes of a
   /// [Document] to the syncronization services.
   String remote;
 
@@ -80,9 +82,54 @@ abstract class Model {
   }
 
   /// Transform a [Model] instance to a [Map] of [String] key and [dynamic] value.
-  /// 
+  ///
   /// Requires to be implemented
   Map<String, dynamic> toMap() {
     throw "toMap method is not implemented";
+  }
+
+  toJson() => this.toMap();
+
+  static Future<T> childOf<T extends Model>(
+    Map<String, dynamic> parent,
+    String collectionName,
+    String field,
+  ) async {
+    final Collection<T> subCollection = G3S.instance.collection('$collectionName.$field');
+    T child;
+    if (!parent.containsKey(field)) {
+      final childrenCollection = subCollection.where({collectionName: parent['local']});
+      final children = await childrenCollection.get(true);
+      child = children.isNotEmpty ? children[0] : null;
+    } else if (parent[field] is String) {
+      child = await subCollection.doc(parent[field]).get(true);
+    } else if (parent[field] is Map) {
+      parent[field][collectionName] = parent['local'];
+      child = await subCollection.fromMap(parent[field]);
+    }
+    return child;
+  }
+
+  static Future<List<T>> childrenOf<T extends Model>(
+    Map<String, dynamic> parent,
+    String collectionName,
+    String field,
+  ) async {
+    final Collection<T> subCollection = G3S.instance.collection('$collectionName.$field');
+    List<T> children = List<T>();
+    if (!parent.containsKey(field)) {
+      final childrenCollection = subCollection.where({collectionName: parent['local']});
+      children = await childrenCollection.get(true);
+    } else {
+      final currentField = parent[field];
+      if (currentField is List) {
+        if (currentField is List<String>) {
+          children = await Future.wait<T>(currentField.map((child) => subCollection.doc(child).get(true)));
+        } else if (currentField is List<Map>) {
+          children = await Future.wait<T>(currentField.map((child) => subCollection.fromMap(child)));
+        }
+      }
+    }
+    return children;
   }
 }

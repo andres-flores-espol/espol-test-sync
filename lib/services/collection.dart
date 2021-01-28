@@ -55,7 +55,7 @@ abstract class CollectionService {
     return document;
   }
 
-  Future<void> find(Map<String, dynamic> query) async {
+  Future<void> select(Map<String, dynamic> query) async {
     final collection = this.collection;
     final db = await dbProvider.database;
     final where = query.keys.map((key) => "$key=?").join(' AND ');

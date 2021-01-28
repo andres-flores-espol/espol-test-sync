@@ -1,4 +1,4 @@
-import 'package:band_names/models/band.dart';
+// import 'package:band_names/models/band.dart';
 // import 'package:band_names/services/bands.dart';
 import 'package:band_names/modules/g3s/g3s.dart';
 import 'package:band_names/services/socket.dart';
@@ -58,7 +58,6 @@ class HomePage extends StatelessWidget {
           // StreamBuilder<List<Band>>(
           //   stream: bandCollection.snapshots(),
           //   builder: (context, snapshot) {
-          //     print(snapshot);
           //     if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
           //     final bands = snapshot.data;
           //     return Column(
@@ -82,32 +81,32 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _bandTile(Band band) {
-    return Dismissible(
-      key: Key(band.local),
-      direction: DismissDirection.startToEnd,
-      onDismissed: (direction) {
-        bandCollection.doc(band.local).delete();
-      },
-      background: Container(
-          padding: EdgeInsets.only(left: 8.0),
-          color: Colors.red,
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text('Delete Band', style: TextStyle(color: Colors.white)),
-          )),
-      child: ListTile(
-        leading: CircleAvatar(
-          child: Text(band.name.substring(0, 2)),
-          backgroundColor: Colors.blue[100],
-        ),
-        title: Text(band.name),
-        subtitle: Text('${band.city.name}, ${band.city.country}'),
-        trailing: Text('${band.votes}', style: TextStyle(fontSize: 20)),
-        onTap: () => _incrementVotes(band),
-      ),
-    );
-  }
+  // Widget _bandTile(Band band) {
+  //   return Dismissible(
+  //     key: Key(band.local),
+  //     direction: DismissDirection.startToEnd,
+  //     onDismissed: (direction) {
+  //       bandCollection.doc(band.local).delete();
+  //     },
+  //     background: Container(
+  //         padding: EdgeInsets.only(left: 8.0),
+  //         color: Colors.red,
+  //         child: Align(
+  //           alignment: Alignment.centerLeft,
+  //           child: Text('Delete Band', style: TextStyle(color: Colors.white)),
+  //         )),
+  //     child: ListTile(
+  //       leading: CircleAvatar(
+  //         child: Text(band.name.substring(0, 2)),
+  //         backgroundColor: Colors.blue[100],
+  //       ),
+  //       title: Text(band.name),
+  //       subtitle: Text('${band.city.name}, ${band.city.country}'),
+  //       trailing: Text('${band.votes}', style: TextStyle(fontSize: 20)),
+  //       onTap: () => _incrementVotes(band),
+  //     ),
+  //   );
+  // }
 
   addNewBand(BuildContext context) {
     final textController = new TextEditingController();
@@ -145,10 +144,10 @@ class HomePage extends StatelessWidget {
     Navigator.pop(context);
   }
 
-  void _incrementVotes(Band band) {
-    final changes = {
-      'votes': band.votes + 1,
-    };
-    bandCollection.doc(band.local).update(changes);
-  }
+  // void _incrementVotes(Band band) {
+  //   final changes = {
+  //     'votes': band.votes + 1,
+  //   };
+  //   bandCollection.doc(band.local).update(changes);
+  // }
 }

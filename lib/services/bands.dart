@@ -11,7 +11,7 @@ class BandService extends CollectionService {
   BandService._internal() {
     name = 'bands';
     _syncService.services.putIfAbsent(name, () => this);
-    find({});
+    select({});
     socket.on('create', (data) {
       // print(data);
     });
@@ -37,11 +37,11 @@ class BandService extends CollectionService {
   }
 
   @override
-  Future<void> find(Map<String, dynamic> query) async {
-    await super.find(query);
+  Future<void> select(Map<String, dynamic> query) async {
+    await super.select(query);
     await _syncService.create({
       'collection': 'bands',
-      'method': 'find',
+      'method': 'select',
       'document': json.encode(query),
       'datetime': DateTime.now().millisecondsSinceEpoch,
       'state': 0,

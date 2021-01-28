@@ -26,6 +26,7 @@ class BandCity extends Model {
 
   static BandCity fromMap(Map<String, dynamic> obj) {
     if (obj == null) return null;
+    if (obj.length == 0) return null;
     return BandCity(
       local: obj['local'],
       remote: obj['remote'] ?? obj['_id'] ?? obj['local'],
@@ -46,28 +47,3 @@ class BandCity extends Model {
     };
   }
 }
-
-// void test() async {
-//   final g3s = G3S.instance;
-//   g3s.setSchema<BandCity>('band.city', BandCity.schema, BandCity.fromMap);
-//   g3s.setSchema<Band>('bands', Band.schema, Band.fromMap);
-
-//   final Collection<BandCity> bandCityCollection = g3s.collection('band.city');
-//   final Collection<Band> bandCollection = g3s.collection('bands');
-
-//   final bandCity = await bandCityCollection.add({
-//     'name': 'Tokyo',
-//     'country': 'Japan',
-//   });
-//   final band = await bandCollection.add({
-//     'name': 'M2U',
-//     'votes': 0,
-//     'city': bandCity.local,
-//   });
-//   await bandCollection.doc(band.local).update({
-//     'votes': band.votes + 1,
-//   });
-//   await bandCityCollection.doc(band.city.local).update({
-//     'name': 'Kyoto',
-//   });
-// }

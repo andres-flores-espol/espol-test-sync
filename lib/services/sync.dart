@@ -12,7 +12,7 @@ class SyncService extends CollectionService {
 
   SyncService._internal() {
     name = 'syncs';
-    find({'state': 0});
+    select({'state': 0});
     socket.on('connect', (_) {
       if (!emiting) {
         emiting = true;
@@ -34,24 +34,22 @@ class SyncService extends CollectionService {
     var collection = await db.query(
       'syncs',
       where: "state=? AND method!=?",
-      whereArgs: [0, 'find'],
+      whereArgs: [0, 'select'],
       orderBy: 'datetime',
     );
     if (collection.length == 0) {
       collection = await db.query(
         'syncs',
         where: "state=? AND method==?",
-        whereArgs: [0, 'find'],
+        whereArgs: [0, 'select'],
         orderBy: 'datetime',
       );
       if (collection.length == 0) {
-        // print('sync ready');
         emiting = false;
         return;
       }
     }
     final event = collection[0];
-    // print(event);
     switch (event['method']) {
       case 'create':
         try {
@@ -60,9 +58,9 @@ class SyncService extends CollectionService {
           emit();
         }
         break;
-      case 'find':
+      case 'select':
         try {
-          await syncFindBy(event);
+          await syncSelectBy(event);
         } catch (e) {
           emit();
         }
@@ -82,7 +80,6 @@ class SyncService extends CollectionService {
         }
         break;
       default:
-        // print('Unknown method.');
     }
   }
 
@@ -130,10 +127,10 @@ class SyncService extends CollectionService {
     );
   }
 
-  Future<void> syncFindBy(Map<String, dynamic> event) async {
+  Future<void> syncSelectBy(Map<String, dynamic> event) async {
     final query = json.decode(event['document']);
     socket.emitWithAck(
-      '${event['collection']}.find',
+      '${event['collection']}.select',
       [query, event, token],
       ack: (Map<String, dynamic> response) async {
         if (response['hasError']) return;

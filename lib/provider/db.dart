@@ -13,10 +13,8 @@ class DBProvider extends DatabaseProvider {
   Future<Database> initDB() async {
     Directory directory = await getApplicationDocumentsDirectory();
     final path = join(directory.path, 'store.db');
-    // print(path);
     return await openDatabase(path, version: 1, onCreate: (Database db, int version) async {
       for (String createTable in createTables) {
-        // print(createTable);
         await db.execute(createTable);
       }
     });

@@ -1,34 +1,34 @@
-import 'package:band_names/models/band_city.dart';
 import 'package:flutter/material.dart';
 
 import 'package:band_names/modules/g3s/g3s.dart';
 import 'package:band_names/provider/db.dart';
 import 'package:band_names/services/socket.dart';
-import 'package:band_names/models/band.dart';
+
+import 'package:band_names/models/roadmap.dart';
+import 'package:band_names/models/roadmap_expense.dart';
+import 'package:band_names/models/roadmap_vehicle.dart';
 
 import 'package:band_names/pages/home.dart';
 import 'package:band_names/pages/status.dart';
 
-  void main() {
-    WidgetsFlutterBinding.ensureInitialized();
-    runApp(MyApp());
-  }
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(MyApp());
+}
 
 class MyApp extends StatelessWidget {
-MyApp() {
-  // print('----- SyncCronProvider -----');
-  // SyncCronProvider();
-  print('----- G3S -----');
-  final gs3 = G3S.instance;
-  print('----- DBProvider -----');
-  gs3.setDatabaseProvider(DBProvider());
-  print('----- SocketService -----');
-  gs3.setIOSocket(SocketService().socket);
-  print('----- Band -----');
-  gs3.setSchema<Band>('band', Band.schema, Band.fromMap);
-  print('----- BandCity -----');
-  gs3.setSchema<BandCity>('band.city', BandCity.schema, BandCity.fromMap);
-}
+  MyApp() {
+    // SyncCronProvider();
+    final g3s = G3S.instance;
+    g3s.setDatabaseProvider(DBProvider());
+    g3s.setIOSocket(SocketService().socket);
+    g3s.initSyncronization();
+    // g3s.setSchema<Band>('band', Band.schema, Band.fromMap);
+    // g3s.setSchema<BandCity>('band.city', BandCity.schema, BandCity.fromMap);
+    g3s.setSchema<Roadmap>('roadmap', Roadmap.schema, Roadmap.fromMap);
+    g3s.setSchema<RoadmapVehicle>('roadmap.vehicle', RoadmapVehicle.schema, RoadmapVehicle.fromMap);
+    g3s.setSchema<RoadmapExpense>('roadmap.expense', RoadmapExpense.schema, RoadmapExpense.fromMap);
+  }
 
   @override
   Widget build(BuildContext context) {
