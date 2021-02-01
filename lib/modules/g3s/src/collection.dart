@@ -47,14 +47,14 @@ class Collection<T extends Model> with CollectionMixin {
   /// Makes a [filter] query into [local] database in a table specified by his [name].
   Future<List<Map<String, dynamic>>> _selectLocal(Map<String, dynamic> filter, Map<String, String> orderBy) async {
     final local = await G3S.instance.local;
-    final where = filter.keys.map((key) => '$key=?').join(' AND ');
+    final where = filter.keys.map((key) => '\"$key\"=?').join(' AND ');
     final whereArgs = filter.values.map((value) => value).toList();
-    final order = orderBy.entries.map((e) => '${e.key} ${e.value}').join(', ');
+    final order = orderBy.entries.map((e) => '\"${e.key}\" ${e.value}').join(', ');
     final documentList = await local.query(
       '\"g3s.$name\"',
       where: where.isNotEmpty ? where : null,
       whereArgs: whereArgs,
-      orderBy: _order.isNotEmpty ? order : null,
+      orderBy: orderBy.isNotEmpty ? order : null,
     );
     return documentList.map((e) => Map<String, dynamic>.from(e)).toList();
   }
@@ -89,8 +89,13 @@ class Collection<T extends Model> with CollectionMixin {
         'datetime': (DateTime.now().millisecondsSinceEpoch / 1000).floor(),
       });
       g3s.emit();
-      // await Future.delayed(Duration(seconds: 3));
-      // loading = false;
+      if (g3s.socket.connected) {
+        g3s.socket.once('disconnect', (_) {
+          loading = false;
+        });
+      } else {
+        loading = false;
+      }
     }
   }
 
@@ -111,6 +116,7 @@ class Collection<T extends Model> with CollectionMixin {
       _updateStream(documentList);
       _updateDocs(documentList);
       _selectRemote(currentFilter);
+      where({}).orderBy({});
     });
     return stream.transform<List<T>>(_streamModel);
   }
@@ -125,17 +131,17 @@ class Collection<T extends Model> with CollectionMixin {
   /// Fetch the documents for this [Collection].
   Future<List<T>> get([bool forceLocal = false]) async {
     final filter = Map<String, dynamic>.from(_filter);
-    final orderBy = Map<String, String>.from(_order);
-    var documentList = await _selectLocal(filter, orderBy);
+    final _orderBy = Map<String, String>.from(_order);
+    var documentList = await _selectLocal(filter, _orderBy);
     _updateDocs(documentList);
     if (!forceLocal) {
       loading = true;
       _selectRemote(filter);
       await _waitForIt();
-      documentList = await _selectLocal(filter, orderBy);
+      documentList = await _selectLocal(filter, _orderBy);
       _updateDocs(documentList);
     }
-    where({});
+    where({}).orderBy({});
     return await Future.wait(documentList.map((e) => fromMap(e)));
   }
 
@@ -176,7 +182,7 @@ class Collection<T extends Model> with CollectionMixin {
   }
 
   /// Creates new documents for nested datas
-  Future<Map<String, dynamic>> _addNesteds(Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> _addNesteds(Map<String, dynamic> data, forceLocal) async {
     final _data = Map<String, dynamic>.from(data);
     final entries = _data.entries.toList();
     for (var entry in entries) {
@@ -190,7 +196,7 @@ class Collection<T extends Model> with CollectionMixin {
         for (var index in value.asMap().keys) {
           if (value[index] is Map) {
             value[index][name] = _data['local'];
-            await G3S.instance.collection("$name.$key").add(value[index], true);
+            await G3S.instance.collection("$name.$key").add(value[index], forceLocal);
           }
         }
         _data.remove(key);
@@ -202,32 +208,42 @@ class Collection<T extends Model> with CollectionMixin {
   /// Insert the document [data] into local [Database] in a table specified by his [name]
   Future<void> _addLocal(Map<String, dynamic> data) async {
     final _data = Map<String, dynamic>.from(data);
+    final fields = List<String>.from(_data.keys);
+    fields.forEach((field) {
+      _data.putIfAbsent('\"$field\"', () => _data.remove(field));
+    });
     final local = await G3S.instance.local;
-    await local.insert('\"g3s.$name\"', _data);
+    final element = await local.query(
+      '\"g3s.$name\"',
+      where: 'local=? OR remote=?',
+      whereArgs: [_data['\"local\"'], _data['\"remote\"']],
+    );
+    if (element.isEmpty)
+      await local.insert('\"g3s.$name\"', _data);
+    else {
+      final localKey = _data.remove('\"local\"');
+      final remoteKey = _data.remove('\"remote\"');
+      await local.update(
+        '\"g3s.$name\"',
+        _data,
+        where: 'local=? OR remote=?',
+        whereArgs: [localKey, remoteKey],
+      );
+    }
   }
 
   Map<String, dynamic> _clean(Map<String, dynamic> data, String parent) {
     final _data = Map<String, dynamic>.from(data);
     _data.remove('local');
     _data.remove('remote');
-    _data.forEach((key, value) {
-      if (value is Map) {
-        value.remove(parent);
-        _data.update(key, (value) => _clean(value, '$parent.$key'));
+    final fields = List<String>.from(_data.keys);
+    fields.forEach((field) {
+      if (_data[field] is Map) {
+        _data[field].remove(parent);
+        _data[field] = _clean(_data[field], '$parent.$field');
       }
-      if (value is List) {
-        _data.update(
-          key,
-          (value) => value.map(
-            (element) {
-              if (element is Map) {
-                element.remove(parent);
-                element = _clean(element, '$parent.$key');
-              }
-              return element;
-            },
-          ).toList(),
-        );
+      if (_data[field] is List) {
+        _data.remove(field);
       }
     });
     return _data;
@@ -257,7 +273,7 @@ class Collection<T extends Model> with CollectionMixin {
     _addDocument(_data);
     _addStream(_data);
     if (!forceLocal) _addRemote(_data);
-    _data = await _addNesteds(_data);
+    _data = await _addNesteds(_data, forceLocal);
     await _addLocal(_data);
     return await fromMap(_data);
   }

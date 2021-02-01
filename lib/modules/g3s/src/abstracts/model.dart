@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import '../../g3s.dart';
 
 /// Abstract class definition for [Model].

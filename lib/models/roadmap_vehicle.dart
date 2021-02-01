@@ -1,12 +1,11 @@
 import 'package:band_names/modules/g3s/g3s.dart';
-
-import 'roadmap.dart';
+import 'package:band_names/models/roadmap.dart';
 
 class RoadmapVehicle extends Model {
   static Collection<Roadmap> get _roadmapCollection => G3S.instance.collection('roadmap');
   static final Map<String, String> schema = {
     'local': 'TEXT PRIMARY KEY', // REQUIRED
-    'remote': 'TEXT', // REQUIRED
+    'remote': 'TEXT UNIQUE', // REQUIRED
     'code': 'TEXT',
     'patent': 'TEXT',
     'maxWeight': 'INTEGER',

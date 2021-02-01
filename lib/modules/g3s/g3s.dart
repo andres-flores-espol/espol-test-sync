@@ -14,6 +14,11 @@ export 'src/document.dart';
 export 'src/abstracts/model.dart';
 export 'src/object_id.dart';
 
+final encoder = JsonEncoder.withIndent('  ');
+void pretty(Object object) {
+  print(encoder.convert(object));
+}
+
 /// The entry point for accessing to [G3S].
 ///
 /// You can get an instance by calling `G3S.instance`.
@@ -66,7 +71,7 @@ class G3S {
     if (_local == null) {
       _local = await _databaseProvider.database;
       for (final schema in _schemas.entries) {
-        final schemaString = schema.value.entries.map((e) => '${e.key} ${e.value}').join(',');
+        final schemaString = schema.value.entries.map((e) => '\"${e.key}\" ${e.value}').join(',');
         await _local.execute("CREATE TABLE IF NOT EXISTS \"g3s.${schema.key}\" ($schemaString)");
       }
     }
@@ -114,6 +119,7 @@ class G3S {
   }
 
   void emit() {
+    socket.open();
     if (socket.connected && !_emiting) {
       _emiting = true;
       if (socket.sendBuffer.length == 0) {
@@ -121,10 +127,17 @@ class G3S {
       } else {
         socket.emitBuffered();
       }
+    } else if (socket.disconnected) {
+      _emiting = false;
     }
   }
 
+  void cancel() {
+    _emiting = false;
+  }
+
   void _emit() async {
+    if (!_emiting) return;
     var syncList = await syncCollection.where({'method': 'create'}).orderBy({'datetime': 'ASC'}).get(true);
     if (syncList.isEmpty)
       syncList = await syncCollection.where({'method': 'update'}).orderBy({'datetime': 'ASC'}).get(true);
@@ -138,7 +151,6 @@ class G3S {
     }
     final sync = syncList[0];
     try {
-      // print('${sync.collection}.${sync.method}: ${sync.document} ${json.decode(sync.arg)}');
       if (sync.method == 'create') await _syncCreate(sync);
       if (sync.method == 'update') await _syncUpdate(sync);
       if (sync.method == 'delete') await _syncDelete(sync);
@@ -158,12 +170,20 @@ class G3S {
   Future<void> _syncCreate(Sync sync) async {
     final data = sync.toMap();
     data.remove('remote');
-    final doc = json.decode(data.remove('arg'));
+    final doc = json.decode(sync.arg);
     final _cs = sync.collection.split('.');
     _cs.removeLast();
     _cs.asMap().keys.forEach((i) => _cs[i] = i > 0 ? '${_cs[i - 1]}.${_cs[i]}' : _cs[i]);
+    final _ss = _schemas[sync.collection]
+        .keys
+        .where((key) => _schemas[sync.collection][key].contains('REFERENCES'))
+        .where((key) => !_cs.contains(key))
+        .toList();
+    for (var _s in _ss) {
+      doc[_s] = (await collection(_s).doc(doc[_s]).get(true)).remote;
+    }
     var _d = doc;
-    for (var _c in _cs) {
+    for (var _c in _cs.reversed) {
       _d = (await collection(_c).doc(_d[_c]).get(true)).toMap();
       doc[_c] = _d['remote'];
     }
@@ -173,8 +193,16 @@ class G3S {
       ack: (Map<String, dynamic> response) async {
         try {
           if (response['hasError'] && !response['hasData']) throw response['error'];
-          final String remote = response['data'];
-          await collection(sync.collection).doc(sync.document).update({'remote': remote}, true);
+          final remote = Map<String, dynamic>.from(response['data']);
+          final syncList = await syncCollection.where({
+            'collection': sync.collection,
+            'document': sync.document,
+            'method': 'delete',
+          }).get();
+          await Future.wait(syncList.map((sync) => syncCollection.doc(sync.local).update({'document': remote['_id']})));
+          await collection(sync.collection).doc(sync.document).update({'remote': remote.remove('_id')}, true);
+        } catch (e) {
+          print(e);
         } finally {
           await syncCollection.doc(sync.local).delete();
           _received(sync.local);
@@ -193,6 +221,14 @@ class G3S {
     _cs.asMap().keys.forEach((i) => _cs[i] = i > 0 ? '${_cs[i - 1]}.${_cs[i]}' : _cs[i]);
     final doc = (await collection(sync.collection).doc(sync.document).get(true)).toMap();
     doc[sync.collection] = doc['remote'];
+    final _ss = _schemas[sync.collection]
+        .keys
+        .where((key) => _schemas[sync.collection][key].contains('REFERENCES'))
+        .where((key) => !_cs.contains(key))
+        .toList();
+    for (var _s in _ss) {
+      changes[_s] = (await collection(_s).doc(doc[_s]).get(true)).remote;
+    }
     var _d = doc;
     for (var _c in _cs.reversed) {
       _d = (await collection(_c).doc(_d[_c]).get(true)).toMap();
@@ -214,7 +250,7 @@ class G3S {
     final data = sync.toMap();
     data.remove('remote');
     final doc = json.decode(data.remove('arg'));
-    final filter = {sync.collection: doc['remote'], ...doc};
+    final filter = {sync.collection: sync.document, ...doc};
     final _cs = sync.collection.split('.');
     _cs.removeLast();
     _cs.asMap().keys.forEach((i) => _cs[i] = i > 0 ? '${_cs[i - 1]}.${_cs[i]}' : _cs[i]);
@@ -233,6 +269,34 @@ class G3S {
         _emit();
       },
     );
+  }
+
+  MapEntry<String, dynamic> _mapper(int key, Map<String, dynamic> value1) {
+    final remote = value1['remote'];
+    value1.removeWhere((key, value) => key != 'local' && !(value is List));
+    final _value1 = Map<String, dynamic>.from(value1);
+    _value1.forEach((key, value2) {
+      if (value2 is List) {
+        final _value2 = value2.map((e) => Map<String, dynamic>.from(e)).toList();
+        value1.remove(key);
+        value1.putIfAbsent(key, () => _value2.asMap().map(_mapper));
+      }
+    });
+    return MapEntry(remote, value1);
+  }
+
+  Map<String, dynamic> _remoteFill(Map<String, dynamic> doc, Map<String, dynamic> dk) {
+    Map<String, dynamic> _doc = Map<String, dynamic>.from(doc);
+    _doc.putIfAbsent('remote', () => _doc.remove('_id'));
+    if (dk != null && dk[_doc['remote']] != null) {
+      _doc.putIfAbsent('local', () => dk[_doc['remote']]['local'] ?? _doc['remote']);
+    }
+    _doc.forEach((key, value) {
+      if (value is List) {
+        _doc[key] = value.map((e) => _remoteFill(e, (dk[_doc['remote']] ?? {})[key])).toList();
+      }
+    });
+    return _doc;
   }
 
   Future<void> _syncSelect(Sync sync) async {
@@ -258,24 +322,22 @@ class G3S {
           final List<dynamic> documentList = response['data'];
           final l = await currentCollection.where(filter).get(true);
           final d = await Future.wait(l.map((e) => currentCollection.doc(e.local).delete(true)));
-          final dk = d.asMap().map((key, value) => MapEntry(value.remote, value.local));
+          // final dk = d.asMap().map((key, value) => MapEntry(value.remote, value.local));
+          final dk = d.map((e) => e.toMap()).toList().asMap().map(_mapper);
           await Future.wait(documentList.map((document) async {
-            Map<String, dynamic> newDocument = Map<String, dynamic>.from(document);
-            newDocument.putIfAbsent('remote', () => newDocument.remove('_id'));
-            newDocument.putIfAbsent('local', () => dk[newDocument['remote']] ?? newDocument['remote']);
-            newDocument.forEach((key, value) {
-              if (value is List) {
-                value.asMap().forEach((index, element) {
-                  if (element is Map && element.containsKey('_id')) {
-                    newDocument[key][index]['remote'] = newDocument[key][index].remove('_id');
-                  }
-                });
-                newDocument[key] = List<Map<String, dynamic>>.from(newDocument[key]);
-              }
-            });
-
+            Map<String, dynamic> newDocument = _remoteFill(document, dk);
+            final _ss = _schemas[sync.collection]
+                .keys
+                .where((key) => _schemas[sync.collection][key].contains('REFERENCES'))
+                .toList();
+            for (var _s in _ss) {
+              final refParentList = await collection(_s).where({'remote': newDocument[_s]}).get(true);
+              newDocument[_s] = refParentList.length != 0 ? refParentList[0].local : null;
+            }
             await currentCollection.add(newDocument, true);
           }));
+        } catch (e) {
+          print(e);
         } finally {
           currentCollection.loading = false;
           await syncCollection.doc(sync.local).delete();

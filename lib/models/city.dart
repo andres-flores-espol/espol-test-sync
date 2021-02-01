@@ -1,44 +1,36 @@
 import 'package:band_names/modules/g3s/g3s.dart';
 import 'package:band_names/models/roadmap.dart';
 
-class RoadmapExpense extends Model {
+class City extends Model {
   static Collection<Roadmap> get _roadmapCollection => G3S.instance.collection('roadmap');
   static final Map<String, String> schema = {
     'local': 'TEXT PRIMARY KEY', // REQUIRED
     'remote': 'TEXT UNIQUE', // REQUIRED
-    'code': 'INTEGER',
-    'price': 'INTEGER',
-    'type': 'TEXT',
-    'image': 'TEXT',
-    'roadmap': 'TEXT ${_roadmapCollection.reference}'
+    'name': 'TEXT',
+    'state': 'INTEGER',
+    'roadmap': 'TEXT ${_roadmapCollection.reference}',
   };
 
-  int code;
-  int price;
-  String type;
-  String image;
+  String name;
+  int state;
   String roadmap;
 
-  RoadmapExpense({
+  City({
     String local,
     String remote,
-    this.code,
-    this.price,
-    this.type,
-    this.image,
+    this.name,
+    this.state,
     this.roadmap,
   }) : super(local: local, remote: remote);
 
-  static RoadmapExpense fromMap(Map<String, dynamic> obj) {
+  static Future<City> fromMap(Map<String, dynamic> obj) async {
     if (obj == null) return null;
     if (obj.length == 0) return null;
-    return RoadmapExpense(
+    return City(
       local: obj['local'],
       remote: obj['remote'] ?? obj['_id'] ?? obj['local'],
-      code: obj['code'],
-      price: obj['price'],
-      type: obj['type'],
-      image: obj['image'],
+      name: obj['name'],
+      state: obj['state'],
       roadmap: obj['roadmap'],
     );
   }
@@ -48,10 +40,8 @@ class RoadmapExpense extends Model {
     return {
       'local': local,
       'remote': remote,
-      'code': code,
-      'price': price,
-      'type': type,
-      'image': image,
+      'name': name,
+      'state': state,
       'roadmap': roadmap,
     };
   }

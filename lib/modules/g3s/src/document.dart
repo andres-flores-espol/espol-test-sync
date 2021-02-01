@@ -43,11 +43,13 @@ class Document<T extends Model> with DocumentMixin<T> {
 
   /// Fetch the data of this [Document].
   Future<T> get([bool forceLocal = false]) async {
-    return (await collection.where({'local': localKey}).get(forceLocal))[0];
+    final documentList = await collection.where({'local': localKey}).get(forceLocal);
+    return documentList.length != 0 ? documentList[0] : null;
   }
 
   Future<Map<String, dynamic>> _prepareData() async {
-    return (await get(true)).toMap();
+    final element = await get(true);
+    return element.toMap();
   }
 
   /// Updates the data on the [Stream] of current [Document] and updates
@@ -199,7 +201,7 @@ class Document<T extends Model> with DocumentMixin<T> {
     _data.removeWhere((key, value) => value is Map || value is List);
     g3s.syncCollection.add({
       'collection': collection.name,
-      'document': data['local'],
+      'document': data['remote'],
       'method': 'delete',
       'arg': json.encode(_data),
       'datetime': (DateTime.now().millisecondsSinceEpoch / 1000).floor(),

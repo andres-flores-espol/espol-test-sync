@@ -1,6 +1,6 @@
+import 'package:band_names/modules/g3s/g3s.dart';
 import 'package:band_names/models/roadmap_expense.dart';
 import 'package:band_names/models/roadmap_vehicle.dart';
-import 'package:band_names/modules/g3s/g3s.dart';
 
 class Roadmap extends Model {
   static final Map<String, String> schema = {
